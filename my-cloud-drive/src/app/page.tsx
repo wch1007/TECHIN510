@@ -1,103 +1,150 @@
-import Image from "next/image";
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import styles from './page.module.css';
+
+interface ImageProps {
+  id: number;
+  url: string;
+  width: number;
+  height: number;
+  span?: number; // Optional property for grid row span
+}
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [images, setImages] = useState<ImageProps[]>([]);
+  const [columns, setColumns] = useState(4);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // Calculate columns based on viewport width
+  useEffect(() => {
+    const calculateColumns = () => {
+      if (window.innerWidth < 600) return 2;
+      if (window.innerWidth < 900) return 3;
+      if (window.innerWidth < 1200) return 4;
+      return 5;
+    };
+
+    setColumns(calculateColumns());
+
+    const handleResize = () => {
+      setColumns(calculateColumns());
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Load images
+  useEffect(() => {
+    // In a real application, you'd fetch these from your API
+    const sampleImages = [
+      { id: 1, url: '/images/photo1.jpeg', width: 400, height: 100 },
+      { id: 2, url: '/images/photo2.jpeg', width: 200, height: 400 },
+      { id: 3, url: '/images/photo3.jpeg', width: 300, height: 500 },
+      { id: 4, url: '/images/photo4.jpeg', width: 200, height: 800 },
+      { id: 5, url: '/images/photo5.jpeg', width: 400, height: 600 },
+      // { id: 6, url: '/images/photo6.jpeg', width: 300, height: 800 },
+      // { id: 7, url: '/images/photo7.jpeg', width: 250, height: 350 },
+      // { id: 8, url: '/images/photo8.jpeg', width: 350, height: 500 },
+    ];
+
+    // Process images for masonry layout
+    const processedImages = [];
+    for (let i = 0; i < 80; i++) {
+      const sourceImage = sampleImages[i % sampleImages.length];
+      const aspectRatio = sourceImage.width / sourceImage.height;
+
+      // Calculate span - how many rows this item should take up
+      let span = 5;
+      if (aspectRatio < 0.8) span = 15;       // Portrait
+      else if (aspectRatio < 1.2) span = 10;  // Square-ish
+      else span = 5;                         // Landscape
+
+      processedImages.push({
+        ...sourceImage,
+        id: i + 1,
+        span: span,
+        aspectRatio: aspectRatio
+      });
+    }
+
+    // Shuffle images
+    const shuffled = [...processedImages].sort(() => Math.random() - 0.5);
+    setImages(shuffled);
+  }, []);
+
+  // Handle Google login button click
+  const handleGoogleLogin = () => {
+    console.log('Google login clicked');
+  };
+
+  return (
+    <div className={styles.container}>
+      <main className={styles.main}>
+        {/* Photo Wall Background */}
+        <div
+          className={styles.photoWallBackground}
+          style={{
+            gridTemplateColumns: `repeat(${columns}, 1fr)`,
+            gridAutoRows: '20px' // Larger grid cells for better filling
+          }}
+        >
+          {Array.from({ length: 50 }).map((_, index) => { // More items for better coverage
+            const imageIndex = index % images.length;
+            const image = images[imageIndex] || { id: 0, url: '', width: 300, height: 200, span: 1 };
+
+            return (
+              <div
+                key={index}
+                className={styles.photoItem}
+                style={{
+                  gridRow: `span ${image.span || 1}`
+                }}
+              >
+                <div className={styles.photoInner}>
+                  <div
+                    className={styles.photoBg}
+                    style={{
+                      backgroundImage: `url(${image.url})`,
+                      paddingBottom: `${(image.height / image.width) * 100}%`
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Overlay Content */}
+        <div className={styles.overlay}>
+          <div className={styles.contentBox}>
+            <h1 className={styles.title}>
+              Manage<br />Your Photos<br />Smartly
+            </h1>
+
+            <div className={styles.loginPanel}>
+              <h2>Connect to your drive to get started</h2>
+
+              <button
+                className={styles.googleLoginButton}
+                onClick={handleGoogleLogin}
+              >
+                <div className={styles.googleIcon}>
+                  
+                  <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+                    <path fill="none" d="M0 0h48v48H0z" />
+                  </svg>
+                </div>
+                Authorize Google Login
+              </button>
+            </div>
+          </div>
         </div>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
 }
