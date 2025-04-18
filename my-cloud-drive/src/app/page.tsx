@@ -40,10 +40,10 @@ export default function Home() {
   useEffect(() => {
     // In a real application, you'd fetch these from your API
     const sampleImages = [
-      { id: 1, url: '/images/photo1.jpeg', width: 400, height: 100 },
+      { id: 1, url: '/images/photo1.jpeg', width: 100, height: 100 },
       { id: 2, url: '/images/photo2.jpeg', width: 200, height: 200 },
-      { id: 3, url: '/images/photo3.jpeg', width: 300, height: 500 },
-      { id: 4, url: '/images/photo4.jpeg', width: 200, height: 800 },
+      { id: 3, url: '/images/photo3.jpeg', width: 200, height: 500 },
+      { id: 4, url: '/images/photo4.jpeg', width: 300, height: 300 },
       { id: 5, url: '/images/photo5.jpeg', width: 400, height: 600 },
       // { id: 6, url: '/images/photo6.jpeg', width: 300, height: 800 },
       // { id: 7, url: '/images/photo7.jpeg', width: 250, height: 350 },
@@ -52,7 +52,7 @@ export default function Home() {
 
     // Process images for masonry layout
     const processedImages = [];
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 40; i++) {
       const sourceImage = sampleImages[i % sampleImages.length];
       const aspectRatio = sourceImage.width / sourceImage.height;
 

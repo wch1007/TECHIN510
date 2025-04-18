@@ -1,22 +1,6 @@
-// src/app/api/auth/[...nextauth]/route.ts
-import NextAuth, { AuthOptions } from "next-auth";
+// src/lib/auth.ts
+import { AuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-
-// Define types for better type safety
-interface Token {
-  accessToken?: string;
-  refreshToken?: string;
-}
-
-interface Session {
-  accessToken?: string;
-  refreshToken?: string;
-  user?: {
-    name?: string;
-    email?: string;
-    image?: string;
-  };
-}
 
 export const authOptions: AuthOptions = {
   providers: [
@@ -29,8 +13,8 @@ export const authOptions: AuthOptions = {
           access_type: "offline",
           prompt: "consent",
         },
-      }
-    })
+      },
+    }),
   ],
   session: {
     strategy: "jwt",
@@ -64,7 +48,3 @@ export const authOptions: AuthOptions = {
     },
   },
 };
-
-const handler = NextAuth(authOptions);
-
-export { handler as GET, handler as POST };
