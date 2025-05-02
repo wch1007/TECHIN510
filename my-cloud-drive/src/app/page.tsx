@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import styles from './page.module.css';
 import { signIn, useSession } from "next-auth/react"
+import { useRouter } from 'next/navigation';
 import DriveFiles from "@/components/DriveFiles"
 
 interface ImageProps {
@@ -16,6 +17,25 @@ interface ImageProps {
 export default function Home() {
   const [images, setImages] = useState<ImageProps[]>([]);
   const [columns, setColumns] = useState(4);
+  const router = useRouter();
+  const { data: session, status } = useSession();
+
+  // Check last login time and auto redirect
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const lastLoginTime = localStorage.getItem('lastLoginTime');
+      if (lastLoginTime) {
+        const lastLogin = new Date(lastLoginTime);
+        const now = new Date();
+        const diffInDays = (now.getTime() - lastLogin.getTime()) / (1000 * 60 * 60 * 24);
+        
+        // If logged in within last 2 days, redirect to dashboard
+        if (diffInDays <= 2 && status === 'authenticated') {
+          router.push('/dashboard');
+        }
+      }
+    }
+  }, [status, router]);
 
   // Calculate columns based on viewport width
   useEffect(() => {
@@ -78,12 +98,13 @@ export default function Home() {
   // Handle Google login button click
   const handleGoogleLogin = async () => {
     console.log('Google login clicked');
-    await signIn("google", 
-      { callbackUrl: "/dashboard"
-
-       }
-
-    )
+    // Save login time when user clicks login
+    localStorage.setItem('lastLoginTime', new Date().toISOString());
+    // 直接跳转到 Google 账户选择界面
+    await signIn("google", { 
+      callbackUrl: "/dashboard",
+      prompt: "select_account" // 强制显示账户选择界面
+    });
   };
 
   return (

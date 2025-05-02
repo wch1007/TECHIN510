@@ -35,7 +35,7 @@ export default function PhotoCard({ file, onClose, onSaveNote, savedNote = '' }:
     <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-2 sm:p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[95vh] flex flex-col">
         <div className="flex flex-col md:flex-row overflow-hidden flex-grow">
-          <div className="w-full relative h-[calc(100vh-200px)] overflow-hidden bg-gray-100">
+          <div className="w-full md:w-2/5 relative h-[calc(100vh-200px)] overflow-hidden bg-gray-100 rounded-t-lg md:rounded-t-none md:rounded-l-lg">
             {isVideo ? (
               <div className="w-full h-full flex flex-col items-center justify-center">
                 <div className="relative w-full h-full">
@@ -74,7 +74,7 @@ export default function PhotoCard({ file, onClose, onSaveNote, savedNote = '' }:
             )}
           </div>
           
-          <div className="w-full md:w-1/3 p-4 flex flex-col">
+          <div className="w-full md:w-3/5 p-4 flex flex-col">
             <div className="mb-4">
               <h3 className="text-lg font-medium text-gray-900">{file.name}</h3>
               <p className="text-sm text-gray-500">{isVideo ? 'Video' : 'Image'}</p>
