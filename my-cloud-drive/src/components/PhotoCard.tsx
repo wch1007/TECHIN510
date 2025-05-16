@@ -32,10 +32,10 @@ export default function PhotoCard({ file, onClose, onSaveNote, savedNote = '' }:
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-2 sm:p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[95vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white/95 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col overflow-hidden">
         <div className="flex flex-col md:flex-row overflow-hidden flex-grow">
-          <div className="w-full md:w-2/5 relative h-[calc(100vh-200px)] overflow-hidden bg-gray-100 rounded-t-lg md:rounded-t-none md:rounded-l-lg">
+          <div className="w-full md:w-2/5 relative h-[calc(100vh-200px)] overflow-hidden bg-gray-50/50 rounded-t-2xl md:rounded-t-none md:rounded-l-2xl">
             {isVideo ? (
               <div className="w-full h-full flex flex-col items-center justify-center">
                 <div className="relative w-full h-full">
@@ -74,28 +74,33 @@ export default function PhotoCard({ file, onClose, onSaveNote, savedNote = '' }:
             )}
           </div>
           
-          <div className="w-full md:w-3/5 p-4 flex flex-col">
-            <div className="mb-4">
-              <h3 className="text-lg font-medium text-gray-900">{file.name}</h3>
+          <div className="w-full md:w-3/5 p-6 flex flex-col bg-gradient-to-br from-pink-50/80 via-white to-blue-50/80">
+            <div className="mb-6">
+              <h3 className="text-xl font-medium text-gray-800 mb-1">{file.name}</h3>
               <p className="text-sm text-gray-500">{isVideo ? 'Video' : 'Image'}</p>
             </div>
+            
             <textarea 
-              className="flex-grow border rounded-md p-2 mb-4 resize-none"
-              placeholder="Add notes about this file here..."
+              className="flex-grow border border-pink-100 rounded-xl p-4 mb-6 resize-none bg-white/80 shadow-inner focus:ring-2 focus:ring-pink-200 focus:outline-none transition-all duration-200"
+              placeholder="Write your thoughts here..."
               value={note}
               onChange={(e) => setNote(e.target.value)}
             />
             
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-3">
               <button 
                 onClick={onClose}
-                className="px-4 py-2 border rounded-md hover:bg-gray-100"
+                className="px-6 py-2.5 rounded-full font-semibold text-pink-400 opacity-90 hover:opacity-100 bg-gray-100 hover:bg-gray-200 transition-all duration-200 shadow-sm hover:shadow"
               >
                 Cancel
               </button>
               <button 
-                onClick={handleSave}
-                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSave();
+                }}
+                className="px-6 py-2.5 rounded-full font-semibold text-pink-400 bg-gradient-to-r from-pink-100 via-pink-200 to-purple-100 hover:from-pink-200 hover:to-purple-200 transition-all duration-200 shadow-md hover:shadow-lg"
               >
                 Save Note
               </button>

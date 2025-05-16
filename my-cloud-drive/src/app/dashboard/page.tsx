@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useSession, signOut, signIn } from 'next-auth/react';
 import PhotoCard from '@/components/PhotoCard';
 import { saveNote, getNote, getAllNotes } from '@/lib/notes-service';
-import { FaRegSmile, FaArchive, FaImages, FaSignOutAlt, FaUserCircle } from "react-icons/fa";
+import { FaRegSmile, FaRegFrown, FaRegMeh, FaRegGrin, FaArchive, FaImages, FaSignOutAlt, FaUserCircle } from "react-icons/fa";
 
 // Define MediaFile type
 interface MediaFile {
@@ -155,6 +155,15 @@ export default function Dashboard(): React.ReactElement {
     }
   }, [fetchMediaFiles]);
 
+  // 在组件顶部添加 useEffect 来加载保存的归档状态
+  useEffect(() => {
+    // 从 localStorage 加载归档状态
+    const savedArchivedFiles = localStorage.getItem('archivedFiles');
+    if (savedArchivedFiles) {
+      setArchivedFiles(new Set(JSON.parse(savedArchivedFiles)));
+    }
+  }, []);
+
   // Handle saving notes
   const handleSaveNote = (photoId: string, note: string) => {
     saveNote(photoId, note);
@@ -181,7 +190,7 @@ export default function Dashboard(): React.ReactElement {
     });
   };
 
-  // 添加归档/取消归档功能
+  // 修改 toggleArchive 函数
   const toggleArchive = (fileId: string) => {
     setArchivedFiles(prev => {
       const newSet = new Set(prev);
@@ -190,27 +199,34 @@ export default function Dashboard(): React.ReactElement {
       } else {
         newSet.add(fileId);
       }
+      // 保存到 localStorage
+      localStorage.setItem('archivedFiles', JSON.stringify([...newSet]));
       return newSet;
     });
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-pink-100/40 via-blue-100/40 to-purple-100/40">
       {/* Top navigation bar with user info */}
-      <div className="fixed top-0 left-0 right-0 z-10 bg-gradient-to-r from-pink-100 via-blue-100 to-purple-100 shadow-lg">
+      <div className="fixed top-0 left-0 right-0 z-10 bg-gradient-to-r from-pink-200/90 via-blue-200/90 to-purple-200/90 backdrop-blur-sm shadow-lg">
         <div className="max-w-screen-2xl mx-auto px-4">
           <div className="h-20 flex items-center justify-between">
             {/* Left: Title and navigation */}
             <div className="flex items-center gap-8">
-              <span className="text-3xl text-pink-400"><FaRegSmile /></span>
-              <h1 className="text-2xl font-bold text-gray-700 tracking-wide" style={{letterSpacing: '2px'}}>My Mood Stories</h1>
+              <div className="flex items-center gap-3">
+                <span className="text-3xl text-pink-400"><FaRegSmile /></span>
+                <span className="text-3xl text-blue-400"><FaRegFrown /></span>
+                <span className="text-3xl text-purple-400"><FaRegMeh /></span>
+                <span className="text-3xl text-pink-400"><FaRegGrin /></span>
+              </div>
+              <h1 className="text-2xl font-bold text-gray-700 tracking-wide" style={{letterSpacing: '2px'}}>My Media Stories</h1>
               <div className="flex gap-2">
                 <button
                   onClick={() => setActiveTab('all')}
                   className={`flex items-center gap-1 px-4 py-2 rounded-full transition-colors shadow-sm ${
                     activeTab === 'all'
-                      ? 'bg-pink-200 text-pink-700'
-                      : 'text-gray-500 hover:bg-pink-50'
+                      ? 'bg-pink-300 text-pink-700'
+                      : 'text-gray-500 hover:bg-pink-80'
                   }`}
                 >
                   <FaImages /> All
@@ -219,8 +235,8 @@ export default function Dashboard(): React.ReactElement {
                   onClick={() => setActiveTab('archived')}
                   className={`flex items-center gap-1 px-4 py-2 rounded-full transition-colors shadow-sm ${
                     activeTab === 'archived'
-                      ? 'bg-purple-200 text-purple-700'
-                      : 'text-gray-500 hover:bg-purple-50'
+                      ? 'bg-purple-300 text-purple-700'
+                      : 'text-gray-500 hover:bg-purple-80'
                   }`}
                 >
                   <FaArchive /> Archived
@@ -318,14 +334,14 @@ export default function Dashboard(): React.ReactElement {
                             </div>
                           )}
                         </div>
-                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/40 to-transparent p-2">
                           <div className="flex justify-between items-center">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 toggleArchive(file.id);
                               }}
-                              className="text-white/80 hover:text-white text-xs shrink-0"
+                              className="text-white/80 hover:text-white text-xs px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 transition-all duration-200 shadow-[0_2px_8px_rgba(255,255,255,0.2)] hover:shadow-[0_4px_12px_rgba(255,255,255,0.3)]"
                             >
                               {archivedFiles.has(file.id) ? 'Unarchive' : 'Archive'}
                             </button>
@@ -334,7 +350,7 @@ export default function Dashboard(): React.ReactElement {
                                 e.stopPropagation();
                                 toggleFileVisibility(file.id);
                               }}
-                              className="text-white/80 hover:text-white text-xs shrink-0"
+                              className="text-white/80 hover:text-white text-xs px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 transition-all duration-200 shadow-[0_2px_8px_rgba(255,255,255,0.2)] hover:shadow-[0_4px_12px_rgba(255,255,255,0.3)]"
                             >
                               Hide
                             </button>
@@ -395,14 +411,23 @@ export default function Dashboard(): React.ReactElement {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                           </svg>
                         </div>
-                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                          <div className="flex justify-end items-center">
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/40 to-transparent p-2">
+                          <div className="flex justify-between items-center">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleArchive(file.id);
+                              }}
+                              className="text-white/80 hover:text-white text-xs px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 transition-all duration-200 shadow-[0_2px_8px_rgba(255,255,255,0.2)] hover:shadow-[0_4px_12px_rgba(255,255,255,0.3)]"
+                            >
+                              {archivedFiles.has(file.id) ? 'Unarchive' : 'Archive'}
+                            </button>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 toggleFileVisibility(file.id);
                               }}
-                              className="text-white/80 hover:text-white text-xs shrink-0"
+                              className="text-white/80 hover:text-white text-xs px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 transition-all duration-200 shadow-[0_2px_8px_rgba(255,255,255,0.2)] hover:shadow-[0_4px_12px_rgba(255,255,255,0.3)]"
                             >
                               Hide
                             </button>
