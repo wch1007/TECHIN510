@@ -72,6 +72,7 @@ This project aims to design and develop a web-based platform for managing person
 - npm or yarn for package management
 
 #### Running instruction
+Move the environment configuration file `.env.local` to the source directory
 
 CD to the project directory
 
@@ -81,8 +82,7 @@ Run the project ( may also refer to the README under the project directory )
 
 `npm run dev`
 
-
-
+After opened the page and logged in, the browser may notify you be aware of the safety issue. Please click on advanced and continue to my-cloud-drive webpage.
 
 
 
