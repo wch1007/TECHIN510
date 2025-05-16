@@ -1,5 +1,6 @@
-@import "tailwindcss";
 
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600&display=swap');
+@import "tailwindcss";
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -20,9 +21,9 @@
 }
 
 body {
-  background: var(--background);
+  background: linear-gradient(135deg, #f8fafc 0%, #fbeffb 100%);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Quicksand', 'Helvetica Neue', Arial, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
 }
 
 /* Animation for the photo wall to give it some life */
