@@ -8,6 +8,23 @@ export async function GET(request: Request): Promise<NextResponse> {
   try {
     console.log("Media API route called");
     
+    // 检查环境变量
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      console.error("Missing GOOGLE_CLIENT_ID environment variable");
+      return NextResponse.json(
+        { error: 'Server configuration error: Missing GOOGLE_CLIENT_ID' },
+        { status: 500 }
+      );
+    }
+    
+    if (!process.env.GOOGLE_CLIENT_SECRET) {
+      console.error("Missing GOOGLE_CLIENT_SECRET environment variable");
+      return NextResponse.json(
+        { error: 'Server configuration error: Missing GOOGLE_CLIENT_SECRET' },
+        { status: 500 }
+      );
+    }
+    
     // Parse query parameters
     const url = new URL(request.url);
     const pageToken = url.searchParams.get('pageToken');
@@ -25,6 +42,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     
     if (!(session as any).accessToken) {
       console.error("No access token in session");
+      console.error("Session object:", JSON.stringify(session, null, 2));
       return NextResponse.json(
         { error: 'Not authenticated - No access token' },
         { status: 401 }
@@ -53,16 +71,29 @@ export async function GET(request: Request): Promise<NextResponse> {
     const response = await drive.files.list({
       pageSize: 20,
       pageToken: pageToken || undefined,
-      fields: 'nextPageToken, files(id, name, mimeType, thumbnailLink, webViewLink, webContentLink, hasThumbnail, createdTime, size)',
+      fields: 'nextPageToken, files(id, name, mimeType, thumbnailLink, webViewLink, webContentLink, hasThumbnail, createdTime, size, imageMediaMetadata)',
       q: "mimeType contains 'image/' or mimeType contains 'video/'",
       orderBy: 'createdTime desc'
     });
     
     console.log(`Got ${response.data.files?.length || 0} files from Drive`);
     
-    // Return the actual drive data
+    // Process files to extract image dimensions
+    const processedFiles = response.data.files?.map(file => {
+      const processedFile: any = { ...file };
+      
+      // Extract width and height from imageMediaMetadata if available
+      if (file.imageMediaMetadata) {
+        processedFile.width = file.imageMediaMetadata.width;
+        processedFile.height = file.imageMediaMetadata.height;
+      }
+      
+      return processedFile;
+    }) || [];
+    
+    // Return the processed drive data
     return NextResponse.json({
-      files: response.data.files || [],
+      files: processedFiles,
       nextPageToken: response.data.nextPageToken
     });
     

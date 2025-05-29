@@ -75,6 +75,70 @@ export default function Dashboard(): React.ReactElement {
     if (node) observer.current.observe(node);
   }, [loading, hasMore, nextPageToken]);
 
+  // 前端检测图片方向的状态
+  const [detectedOrientations, setDetectedOrientations] = useState<Record<string, 'portrait' | 'landscape' | 'square'>>({});
+
+  // 检测图片尺寸的辅助函数
+  const detectImageOrientation = useCallback((file: MediaFile): Promise<'portrait' | 'landscape' | 'square'> => {
+    return new Promise((resolve) => {
+      const img = new (window as any).Image() as HTMLImageElement;
+      img.onload = () => {
+        const aspectRatio = img.width / img.height;
+        let orientation: 'portrait' | 'landscape' | 'square';
+        
+        if (aspectRatio < 0.9) {
+          orientation = 'portrait';
+        } else if (aspectRatio > 1.1) {
+          orientation = 'landscape';
+        } else {
+          orientation = 'square';
+        }
+        
+        console.log(`🖼️ 前端检测 ${file.name}: ${img.width}x${img.height}, 比例: ${aspectRatio.toFixed(2)} → ${orientation}`);
+        
+        // 更新检测结果
+        setDetectedOrientations(prev => ({
+          ...prev,
+          [file.id]: orientation
+        }));
+        
+        resolve(orientation);
+      };
+      img.onerror = () => {
+        // 如果加载失败，默认为横向
+        resolve('landscape');
+      };
+      img.src = `/api/drive/thumbnail/${file.id}`;
+    });
+  }, []);
+
+  // 启动前端检测
+  useEffect(() => {
+    if (files.length > 0) {
+      // 对前几张图片进行前端检测
+      files.slice(0, 20).forEach(file => {
+        if (!file.mimeType.includes('video') && !detectedOrientations[file.id]) {
+          detectImageOrientation(file);
+        }
+      });
+    }
+  }, [files, detectImageOrientation, detectedOrientations]);
+
+  // 延时检测更多图片（避免一次性加载太多）
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (files.length > 20) {
+        files.slice(20, 50).forEach(file => {
+          if (!file.mimeType.includes('video') && !detectedOrientations[file.id]) {
+            detectImageOrientation(file);
+          }
+        });
+      }
+    }, 2000); // 2秒后检测更多图片
+
+    return () => clearTimeout(timer);
+  }, [files, detectImageOrientation, detectedOrientations]);
+
   // 提高缩略图质量的函数
   const getHighQualityThumbnail = (url: string) => {
     try {
@@ -153,6 +217,83 @@ export default function Dashboard(): React.ReactElement {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   };
+
+  // 按图片方向分组的函数
+  const groupFilesByOrientation = useCallback((files: MediaFile[]) => {
+    const portraitFiles: MediaFile[] = []; // 竖向图片 (高>宽)
+    const landscapeFiles: MediaFile[] = []; // 横向图片 (宽>高)
+    const squareFiles: MediaFile[] = []; // 正方形图片 (宽≈高)
+    
+    console.log('🔍 开始分组文件，总数:', files.length, '已检测:', Object.keys(detectedOrientations).length);
+    
+    files.forEach(file => {
+      // 优先使用前端检测的结果
+      if (detectedOrientations[file.id]) {
+        const orientation = detectedOrientations[file.id];
+        console.log(`✅ 使用前端检测结果 ${file.name}: ${orientation}`);
+        
+        if (orientation === 'portrait') {
+          portraitFiles.push(file);
+        } else if (orientation === 'landscape') {
+          landscapeFiles.push(file);
+        } else {
+          squareFiles.push(file);
+        }
+        return;
+      }
+      
+      // 从Google Drive API获取图片尺寸（如果可用）
+      if (file.width && file.height) {
+        const aspectRatio = file.width / file.height;
+        console.log(`📐 API数据 ${file.name}: ${file.width}x${file.height}, 比例: ${aspectRatio.toFixed(2)}`);
+        
+        if (aspectRatio < 0.9) {
+          portraitFiles.push(file); // 竖向
+          console.log(`📱 竖向: ${file.name}`);
+        } else if (aspectRatio > 1.1) {
+          landscapeFiles.push(file); // 横向
+          console.log(`🖼️ 横向: ${file.name}`);
+        } else {
+          squareFiles.push(file); // 正方形
+          console.log(`⬛ 正方形: ${file.name}`);
+        }
+      } else {
+        // 如果没有尺寸信息，先尝试根据文件名推断
+        const fileName = file.name.toLowerCase();
+        
+        // 根据常见的文件名模式推断
+        if (fileName.includes('portrait') || fileName.includes('vertical') || fileName.includes('竖') || fileName.includes('vt_')) {
+          console.log(`📱 根据文件名推断为竖向: ${file.name}`);
+          portraitFiles.push(file);
+        } else if (fileName.includes('square') || fileName.includes('sq_') || fileName.includes('正方')) {
+          console.log(`⬛ 根据文件名推断为正方形: ${file.name}`);
+          squareFiles.push(file);
+        } else {
+          // 默认分配到横向组，等待前端检测
+          console.log(`❓ 暂时分配为横向，等待检测: ${file.name}`);
+          landscapeFiles.push(file);
+        }
+      }
+    });
+    
+    // 按创建时间排序每个组
+    const sortByTime = (a: MediaFile, b: MediaFile) => {
+      if (!a.createdTime || !b.createdTime) return 0;
+      return new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime();
+    };
+    
+    portraitFiles.sort(sortByTime);
+    squareFiles.sort(sortByTime);
+    landscapeFiles.sort(sortByTime);
+    
+    console.log(`📊 分组结果: 竖向${portraitFiles.length}张, 正方形${squareFiles.length}张, 横向${landscapeFiles.length}张`);
+    
+    return {
+      portrait: portraitFiles,
+      square: squareFiles,
+      landscape: landscapeFiles
+    };
+  }, [detectedOrientations]);
 
   // 按日期分组文件的函数
   const groupFilesByDate = (files: MediaFile[]) => {
@@ -353,7 +494,7 @@ export default function Dashboard(): React.ReactElement {
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-100/40 via-blue-100/40 to-purple-100/40">
       {/* Top navigation bar with user info */}
-      <div className="fixed top-0 left-0 right-0 z-10 bg-gradient-to-r from-pink-200/90 via-blue-200/90 to-purple-200/90 backdrop-blur-sm shadow-lg">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-pink-200/90 via-blue-200/90 to-purple-200/90 backdrop-blur-sm shadow-lg">
         <div className="max-w-screen-2xl mx-auto px-4">
           <div className="h-20 flex items-center justify-between">
             {/* Left: Title and navigation */}
@@ -654,166 +795,203 @@ export default function Dashboard(): React.ReactElement {
           })()}
         </div>
       ) : (
-        // Grid View (All/Archived)
-        <div className="flex gap-4 p-4 pt-28 w-screen">
-          {/* Image area */}
-          <div className="flex-1 columns-2 sm:columns-3 md:columns-4 lg:columns-5 gap-4">
-            {files
-              .filter(file => {
-                const isArchived = archivedFiles.has(file.id);
-                return activeTab === 'all' ? !isArchived : isArchived;
-              })
-              .filter(file => !file.mimeType.includes('video'))
-              .map((file, index) => {
-                const isLastElement = files.filter(f => !f.mimeType.includes('video')).length === index + 1;
-                const hasNote = notes[file.id]?.note;
-                const isHidden = hiddenFiles.has(file.id);
+        // Grid View (All/Archived) - 按方向分组显示
+        <div className="px-4 pt-28 max-w-full overflow-x-hidden min-h-screen">
+          <div className="flex gap-2 max-w-screen-2xl mx-auto min-h-full">
+            {/* Image area - 按方向分组显示但不显示标题 */}
+            <div className="flex-1 min-w-0">
+              {(() => {
+                const filteredFiles = files
+                  .filter(file => {
+                    const isArchived = archivedFiles.has(file.id);
+                    return activeTab === 'all' ? !isArchived : isArchived;
+                  })
+                  .filter(file => !file.mimeType.includes('video'));
+                
+                const groupedFiles = groupFilesByOrientation(filteredFiles);
+                
+                // 合并所有组，保持方向顺序：竖向 -> 正方形 -> 横向
+                const allFiles = [
+                  ...groupedFiles.portrait,
+                  ...groupedFiles.square, 
+                  ...groupedFiles.landscape
+                ];
                 
                 return (
-                  <div 
-                    key={file.id} 
-                    ref={isLastElement ? lastFileElementRef : null}
-                    className="break-inside-avoid mb-4 cursor-pointer group relative"
-                    onClick={() => setSelectedFile(file)}
-                  >
-                    <div className="relative w-full overflow-hidden rounded-lg shadow-sm hover:shadow-lg transition-shadow">
-                      {isHidden ? (
-                        <div className="w-full h-[80px] bg-gray-50 flex items-center justify-between p-2 rounded-lg border border-gray-200">
-                          <p className="text-sm text-gray-600 truncate flex-1">{file.name}</p>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleFileVisibility(file.id);
-                            }}
-                            className="ml-2 text-xs text-blue-500 hover:text-blue-700 whitespace-nowrap"
-                          >
-                            Show
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="relative w-full">
-                          <div className="relative pb-[150%]">
-                            <Image
-                              src={`/api/drive/thumbnail/${file.id}`}
-                              alt={file.name}
-                              fill
-                              sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
-                              className="absolute top-0 left-0 w-full h-full object-cover"
-                              loading="lazy"
-                            />
-                            {notes[file.id]?.note && (
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center p-4">
-                                <p className="text-white text-sm line-clamp-4 text-center">
-                                  {notes[file.id].note}
-                                </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 pb-20">
+                    {allFiles.map((file, index) => {
+                      const isLastElement = index === allFiles.length - 1;
+                      
+                      // 判断文件属于哪个方向组
+                      const isPortrait = groupedFiles.portrait.includes(file);
+                      const isSquare = groupedFiles.square.includes(file);
+                      const isLandscape = groupedFiles.landscape.includes(file);
+                      
+                      // 根据方向确定宽高比
+                      let aspectClass = 'aspect-square'; // 默认正方形
+                      if (isPortrait) {
+                        aspectClass = 'aspect-[3/4]'; // 竖向 3:4
+                      } else if (isLandscape) {
+                        aspectClass = 'aspect-[4/3]'; // 横向 4:3
+                      }
+                      
+                      return (
+                        <div 
+                          key={file.id} 
+                          ref={isLastElement ? lastFileElementRef : null}
+                          className="cursor-pointer group relative"
+                          onClick={() => setSelectedFile(file)}
+                        >
+                          <div className="relative w-full overflow-hidden rounded-lg shadow-sm hover:shadow-lg transition-shadow">
+                            {hiddenFiles.has(file.id) ? (
+                              <div className="w-full h-32 bg-gray-50 flex items-center justify-between p-2 rounded-lg border border-gray-200">
+                                <p className="text-sm text-gray-600 truncate flex-1">{file.name}</p>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleFileVisibility(file.id);
+                                  }}
+                                  className="ml-2 text-xs text-blue-500 hover:text-blue-700 whitespace-nowrap"
+                                >
+                                  Show
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="relative w-full">
+                                {/* 根据图片方向使用不同的宽高比 */}
+                                <div className={`relative ${aspectClass}`}>
+                                  <Image
+                                    src={`/api/drive/thumbnail/${file.id}`}
+                                    alt={file.name}
+                                    fill
+                                    sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, (max-width: 1280px) 20vw, 16vw"
+                                    className="absolute top-0 left-0 w-full h-full object-cover"
+                                    loading="lazy"
+                                  />
+                                  {notes[file.id]?.note && (
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center p-3">
+                                      <p className="text-white text-xs line-clamp-4 text-center">
+                                        {notes[file.id].note}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/40 to-transparent p-2">
+                                  <div className="flex justify-between items-center">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleArchive(file.id);
+                                      }}
+                                      className="text-white/80 hover:text-white text-xs px-2 py-1 rounded-full bg-white/10 hover:bg-white/20 transition-all duration-200"
+                                    >
+                                      {archivedFiles.has(file.id) ? 'Unarchive' : 'Archive'}
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleFileVisibility(file.id);
+                                      }}
+                                      className="text-white/80 hover:text-white text-xs px-2 py-1 rounded-full bg-white/10 hover:bg-white/20 transition-all duration-200"
+                                    >
+                                      Hide
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
                             )}
                           </div>
-                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/40 to-transparent p-2">
-                            <div className="flex justify-between items-center">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleArchive(file.id);
-                                }}
-                                className="text-white/80 hover:text-white text-xs px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 transition-all duration-200 shadow-[0_2px_8px_rgba(255,255,255,0.2)] hover:shadow-[0_4px_12px_rgba(255,255,255,0.3)]"
-                              >
-                                {archivedFiles.has(file.id) ? 'Unarchive' : 'Archive'}
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleFileVisibility(file.id);
-                                }}
-                                className="text-white/80 hover:text-white text-xs px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 transition-all duration-200 shadow-[0_2px_8px_rgba(255,255,255,0.2)] hover:shadow-[0_4px_12px_rgba(255,255,255,0.3)]"
-                              >
-                                Hide
-                              </button>
-                            </div>
-                          </div>
                         </div>
-                      )}
-                    </div>
+                      );
+                    })}
                   </div>
                 );
-              })}
-          </div>
+              })()}
+            </div>
 
-          {/* Video area */}
-          <div className="w-64 flex-shrink-0">
-            {files
-              .filter(file => {
-                const isArchived = archivedFiles.has(file.id);
-                return activeTab === 'all' ? !isArchived : isArchived;
-              })
-              .filter(file => file.mimeType.includes('video'))
-              .map((file) => {
-                const hasNote = notes[file.id]?.note;
-                const isHidden = hiddenFiles.has(file.id);
-                
-                return (
-                  <div 
-                    key={file.id} 
-                    className="mb-4 cursor-pointer group relative"
-                    onClick={() => setSelectedFile(file)}
-                  >
-                    <div className="relative w-full overflow-hidden rounded-lg shadow-sm hover:shadow-lg transition-shadow">
-                      {isHidden ? (
-                        <div className="w-full h-[80px] bg-gray-50 flex items-center justify-between p-2 rounded-lg border border-gray-200">
-                          <p className="text-sm text-gray-600 truncate flex-1">{file.name}</p>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleFileVisibility(file.id);
-                            }}
-                            className="ml-2 text-xs text-blue-500 hover:text-blue-700 whitespace-nowrap"
-                          >
-                            Show
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="relative w-full aspect-[16/9]">
-                          <Image
-                            src={`/api/drive/thumbnail/${file.id}`}
-                            alt={file.name}
-                            fill
-                            sizes="256px"
-                            className="absolute top-0 left-0 w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                          <div className="absolute inset-0 bg-black bg-opacity-30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                            </svg>
+            {/* Video area - 侧边栏，只在有视频时显示 */}
+            {files.filter(file => {
+              const isArchived = archivedFiles.has(file.id);
+              return activeTab === 'all' ? !isArchived : isArchived;
+            }).filter(file => file.mimeType.includes('video')).length > 0 && (
+              <div className="w-48 lg:w-56 xl:w-64 flex-shrink-0 h-fit">
+                <div className="sticky top-24 z-20 space-y-3">
+                  {files
+                    .filter(file => {
+                      const isArchived = archivedFiles.has(file.id);
+                      return activeTab === 'all' ? !isArchived : isArchived;
+                    })
+                    .filter(file => file.mimeType.includes('video'))
+                    .map((file) => {
+                      const hasNote = notes[file.id]?.note;
+                      const isHidden = hiddenFiles.has(file.id);
+                      
+                      return (
+                        <div 
+                          key={file.id} 
+                          className="cursor-pointer group relative"
+                          onClick={() => setSelectedFile(file)}
+                        >
+                          <div className="relative w-full overflow-hidden rounded-lg shadow-sm hover:shadow-lg transition-shadow">
+                            {isHidden ? (
+                              <div className="w-full h-20 bg-gray-50 flex items-center justify-between p-2 rounded-lg border border-gray-200">
+                                <p className="text-sm text-gray-600 truncate flex-1">{file.name}</p>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleFileVisibility(file.id);
+                                  }}
+                                  className="ml-2 text-xs text-blue-500 hover:text-blue-700 whitespace-nowrap"
+                                >
+                                  Show
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="relative w-full aspect-[16/9]">
+                                <Image
+                                  src={`/api/drive/thumbnail/${file.id}`}
+                                  alt={file.name}
+                                  fill
+                                  sizes="(max-width: 1024px) 192px, (max-width: 1280px) 224px, 256px"
+                                  className="absolute top-0 left-0 w-full h-full object-cover"
+                                  loading="lazy"
+                                />
+                                <div className="absolute inset-0 bg-black bg-opacity-30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                  </svg>
+                                </div>
+                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/40 to-transparent p-2">
+                                  <div className="flex justify-between items-center">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleArchive(file.id);
+                                      }}
+                                      className="text-white/80 hover:text-white text-xs px-2 py-1 rounded-full bg-white/10 hover:bg-white/20 transition-all duration-200"
+                                    >
+                                      {archivedFiles.has(file.id) ? 'Unarchive' : 'Archive'}
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleFileVisibility(file.id);
+                                      }}
+                                      className="text-white/80 hover:text-white text-xs px-2 py-1 rounded-full bg-white/10 hover:bg-white/20 transition-all duration-200"
+                                    >
+                                      Hide
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/40 to-transparent p-2">
-                            <div className="flex justify-between items-center">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleArchive(file.id);
-                                }}
-                                className="text-white/80 hover:text-white text-xs px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 transition-all duration-200 shadow-[0_2px_8px_rgba(255,255,255,0.2)] hover:shadow-[0_4px_12px_rgba(255,255,255,0.3)]"
-                              >
-                                {archivedFiles.has(file.id) ? 'Unarchive' : 'Archive'}
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleFileVisibility(file.id);
-                                }}
-                                className="text-white/80 hover:text-white text-xs px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 transition-all duration-200 shadow-[0_2px_8px_rgba(255,255,255,0.2)] hover:shadow-[0_4px_12px_rgba(255,255,255,0.3)]"
-                              >
-                                Hide
-                              </button>
-                            </div>
-                          </div>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                      );
+                    })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -846,4 +1024,4 @@ export default function Dashboard(): React.ReactElement {
       )}
     </div>
   );
-} 
+}
