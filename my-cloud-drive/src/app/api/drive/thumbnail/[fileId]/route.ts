@@ -9,7 +9,7 @@ export async function GET(
   { params }: { params: { fileId: string } }
 ): Promise<Response> {
   try {
-    const fileId = params.fileId;
+    const { fileId } = await params;
     
     // 获取服务器会话用于认证
     const session = await getServerSession(authOptions);

@@ -41,7 +41,17 @@ export default function Dashboard(): React.ReactElement {
   const [hiddenFiles, setHiddenFiles] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<'all' | 'archived' | 'timeline'>('all');
   const [archivedFiles, setArchivedFiles] = useState<Set<string>>(new Set());
-  const [timelineFilter, setTimelineFilter] = useState<string>('all'); // 'all', 'thisMonth', 'lastMonth', 'thisYear'
+  const [timelineFilter, setTimelineFilter] = useState<string>('all');
+  const [dateRange, setDateRange] = useState<{startDate: string, endDate: string}>({
+    startDate: '',
+    endDate: ''
+  });
+  const [appliedFilter, setAppliedFilter] = useState<string>('all');
+  const [appliedDateRange, setAppliedDateRange] = useState<{startDate: string, endDate: string}>({
+    startDate: '',
+    endDate: ''
+  });
+  const [timezoneMethod, setTimezoneMethod] = useState<'local' | 'utc' | 'smart'>('local');
   
   // Reference to track if this is the initial load
   const initialLoad = useRef(true);
@@ -148,11 +158,39 @@ export default function Dashboard(): React.ReactElement {
   const groupFilesByDate = (files: MediaFile[]) => {
     const groups: Record<string, MediaFile[]> = {};
     
+    // 添加调试标志
+    const DEBUG_DATES = true;
+    
     files.forEach(file => {
       if (!file.createdTime) return;
       
-      const date = new Date(file.createdTime);
-      const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+      let dateKey: string;
+      const originalDate = new Date(file.createdTime);
+      
+      switch (timezoneMethod) {
+        case 'utc':
+          // 使用UTC日期
+          dateKey = originalDate.toISOString().split('T')[0];
+          break;
+        case 'smart':
+          // 智能处理：尝试从Google Drive的预期行为推断
+          const smartDate = new Date(file.createdTime);
+          // 如果是深夜时间（可能跨日），使用智能调整
+          if (smartDate.getUTCHours() >= 16) { // UTC 16:00+ 可能是次日凌晨
+            const adjustedDate = new Date(smartDate.getTime() + (8 * 60 * 60 * 1000)); // 假设+8时区
+            dateKey = adjustedDate.toISOString().split('T')[0];
+          } else {
+            dateKey = smartDate.toLocaleDateString('en-CA');
+          }
+          break;
+        default: // 'local'
+          dateKey = originalDate.toLocaleDateString('en-CA');
+      }
+      
+      // 简化的调试输出
+      if (DEBUG_DATES) {
+        console.log(`📅 ${file.name}: ${file.createdTime} → ${dateKey} (${timezoneMethod})`);
+      }
       
       if (!groups[dateKey]) {
         groups[dateKey] = [];
@@ -168,15 +206,24 @@ export default function Dashboard(): React.ReactElement {
         return acc;
       }, {} as Record<string, MediaFile[]>);
     
+    if (DEBUG_DATES) {
+      console.log('📊 Final groups:', Object.keys(sortedGroups));
+    }
+    
     return sortedGroups;
   };
 
   // 格式化日期显示
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+    // 使用安全的日期解析函数
+    const date = safeParseDateString(dateString);
+    
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
+    
+    // 添加调试信息
+    console.log(`🗓️ formatDate: ${dateString} → ${date.toDateString()}`);
     
     if (date.toDateString() === today.toDateString()) {
       return 'Today';
@@ -190,6 +237,12 @@ export default function Dashboard(): React.ReactElement {
         day: 'numeric' 
       });
     }
+  };
+
+  // 安全的日期解析函数 - 避免时区问题
+  const safeParseDateString = (dateString: string) => {
+    const [year, month, day] = dateString.split('-').map(Number);
+    return new Date(year, month - 1, day); // month是0-based
   };
 
   // 筛选文件的函数
@@ -215,6 +268,20 @@ export default function Dashboard(): React.ReactElement {
           return fileDate.getFullYear() === now.getFullYear();
         case 'lastYear':
           return fileDate.getFullYear() === now.getFullYear() - 1;
+        case 'custom':
+          if (!appliedDateRange.startDate && !appliedDateRange.endDate) return true;
+          
+          // 获取文件创建的本地日期（yyyy-mm-dd格式），忽略时间部分
+          const fileLocalDate = fileDate.toLocaleDateString('en-CA'); // 'en-CA' gives YYYY-MM-DD format
+          
+          if (appliedDateRange.startDate && appliedDateRange.endDate) {
+            return fileLocalDate >= appliedDateRange.startDate && fileLocalDate <= appliedDateRange.endDate;
+          } else if (appliedDateRange.startDate) {
+            return fileLocalDate >= appliedDateRange.startDate;
+          } else if (appliedDateRange.endDate) {
+            return fileLocalDate <= appliedDateRange.endDate;
+          }
+          return true;
         default:
           return true;
       }
@@ -375,25 +442,31 @@ export default function Dashboard(): React.ReactElement {
         <div className="pt-28 px-4 w-full max-w-6xl mx-auto">
           {(() => {
             const filteredFiles = files.filter(file => !hiddenFiles.has(file.id));
-            const dateFilteredFiles = filterFilesByDate(filteredFiles, timelineFilter);
+            const dateFilteredFiles = filterFilesByDate(filteredFiles, appliedFilter);
             const groupedFiles = groupFilesByDate(dateFilteredFiles);
             const dateKeys = Object.keys(groupedFiles);
 
             return (
               <>
                 {/* Timeline filter */}
-                <div className="flex justify-center mb-8">
+                <div className="flex flex-col items-center mb-8 space-y-4">
+                  {/* Quick filter buttons */}
                   <div className="bg-white/80 rounded-full p-1 shadow-sm">
                     {[
                       { key: 'all', label: 'All Time' },
                       { key: 'thisMonth', label: 'This Month' },
                       { key: 'lastMonth', label: 'Last Month' },
-                      { key: 'thisYear', label: 'This Year' },
-                      { key: 'lastYear', label: 'Last Year' }
+                      { key: 'custom', label: '📅 Select Date Range' }
                     ].map(({ key, label }) => (
                       <button
                         key={key}
-                        onClick={() => setTimelineFilter(key)}
+                        onClick={() => {
+                          setTimelineFilter(key);
+                          if (key !== 'custom') {
+                            setAppliedFilter(key);
+                            setAppliedDateRange({ startDate: '', endDate: '' });
+                          }
+                        }}
                         className={`px-4 py-2 rounded-full text-sm transition-all ${
                           timelineFilter === key
                             ? 'bg-blue-200 text-blue-700 shadow-sm'
@@ -404,6 +477,83 @@ export default function Dashboard(): React.ReactElement {
                       </button>
                     ))}
                   </div>
+
+                  {/* Custom date range inputs */}
+                  {timelineFilter === 'custom' && (
+                    <div className="flex flex-col items-center gap-4 bg-white/90 rounded-xl p-6 shadow-lg border border-blue-100">
+                      <h3 className="text-lg font-semibold text-gray-700">📅 Choose Your Date Range</h3>
+                      
+                      {/* Timezone method selector */}
+                      <div className="flex items-center gap-4 text-sm">
+                        <span className="font-medium text-gray-600">Date display method:</span>
+                        <div className="flex gap-2">
+                          {[
+                            { key: 'local', label: 'Local Time', desc: 'Your timezone' },
+                            { key: 'utc', label: 'UTC Time', desc: 'Same as Google Drive' },
+                            { key: 'smart', label: 'Smart', desc: 'Auto-detect' }
+                          ].map(({ key, label, desc }) => (
+                            <button
+                              key={key}
+                              onClick={() => setTimezoneMethod(key as 'local' | 'utc' | 'smart')}
+                              className={`px-3 py-1 rounded-lg text-xs transition-all ${
+                                timezoneMethod === key
+                                  ? 'bg-blue-100 text-blue-700'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                              title={desc}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-2">
+                          <label className="text-sm font-medium text-gray-600">From:</label>
+                          <input
+                            type="date"
+                            value={dateRange.startDate}
+                            onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                            className="px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-300 focus:outline-none"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-sm font-medium text-gray-600">To:</label>
+                          <input
+                            type="date"
+                            value={dateRange.endDate}
+                            onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                            className="px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-300 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => {
+                            setDateRange({ startDate: '', endDate: '' });
+                          }}
+                          className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                        >
+                          Clear Dates
+                        </button>
+                        <button
+                          onClick={() => {
+                            setAppliedFilter('custom');
+                            setAppliedDateRange(dateRange);
+                          }}
+                          disabled={!dateRange.startDate && !dateRange.endDate}
+                          className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
+                            dateRange.startDate || dateRange.endDate
+                              ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-md hover:shadow-lg'
+                              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                          }`}
+                        >
+                          Apply Filter
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Timeline content */}
@@ -420,7 +570,7 @@ export default function Dashboard(): React.ReactElement {
                               {formatDate(dateKey)}
                             </h3>
                             <p className="text-sm text-gray-400">
-                              {new Date(dateKey).toLocaleDateString('en-US', { 
+                              {safeParseDateString(dateKey).toLocaleDateString('en-US', { 
                                 month: 'short', 
                                 day: 'numeric',
                                 year: 'numeric'
@@ -490,7 +640,7 @@ export default function Dashboard(): React.ReactElement {
                 {dateKeys.length === 0 && (
                   <div className="text-center py-12">
                     <p className="text-gray-500">
-                      {timelineFilter === 'all' 
+                      {appliedFilter === 'all' 
                         ? 'No media files with dates found' 
                         : 'No media files found for the selected time period'}
                     </p>
