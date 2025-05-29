@@ -53,9 +53,9 @@ export async function GET(request: Request): Promise<NextResponse> {
     const response = await drive.files.list({
       pageSize: 20,
       pageToken: pageToken || undefined,
-      fields: 'nextPageToken, files(id, name, mimeType, thumbnailLink, webViewLink, webContentLink, hasThumbnail)',
+      fields: 'nextPageToken, files(id, name, mimeType, thumbnailLink, webViewLink, webContentLink, hasThumbnail, createdTime, size)',
       q: "mimeType contains 'image/' or mimeType contains 'video/'",
-      orderBy: 'modifiedTime desc'
+      orderBy: 'createdTime desc'
     });
     
     console.log(`Got ${response.data.files?.length || 0} files from Drive`);
