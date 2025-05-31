@@ -1,13 +1,13 @@
 // src/app/api/drive/thumbnail/[fileId]/route.ts
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { google } from 'googleapis';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
 export async function GET(
-  request: Request,
-  { params }: { params: { fileId: string } }
-): Promise<Response> {
+  request: NextRequest,
+  { params }: { params: Promise<{ fileId: string }> }
+) {
   try {
     const { fileId } = await params;
     
