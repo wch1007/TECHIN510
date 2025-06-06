@@ -763,10 +763,6 @@ export default function Dashboard(): React.ReactElement {
                                       </p>
                                     )}
                                   </div>
-                                  
-                                  <div className="px-4 pb-3">
-                                    <p className="text-xs text-gray-400 truncate">{file.name}</p>
-                                  </div>
                                 </div>
                               );
                             })}
