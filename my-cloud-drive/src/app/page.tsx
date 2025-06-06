@@ -11,7 +11,7 @@ interface ImageProps {
   url: string;
   width: number;
   height: number;
-  span?: number; // Optional property for grid row span
+  span?: number; // optional property for grid row span
 }
 
 export default function Home() {
@@ -20,7 +20,7 @@ export default function Home() {
   const router = useRouter();
   const { data: session, status } = useSession();
 
-  // Check last login time and auto redirect
+  // check last login time and auto redirect
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const lastLoginTime = localStorage.getItem('lastLoginTime');
@@ -29,7 +29,7 @@ export default function Home() {
         const now = new Date();
         const diffInDays = (now.getTime() - lastLogin.getTime()) / (1000 * 60 * 60 * 24);
         
-        // If logged in within last 2 days, redirect to dashboard
+        // if logged in within last 2 days, redirect to dashboard
         if (diffInDays <= 2 && status === 'authenticated') {
           router.push('/dashboard');
         }
@@ -37,7 +37,7 @@ export default function Home() {
     }
   }, [status, router]);
 
-  // Calculate columns based on viewport width
+  // calculate columns based on viewport width
   useEffect(() => {
     const calculateColumns = () => {
       if (window.innerWidth < 600) return 2;
@@ -56,9 +56,9 @@ export default function Home() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Load images
+  // load images
   useEffect(() => {
-    // In a real application, you'd fetch these from your API
+    // in a real application, you'd fetch these from your API
     const sampleImages = [
       { id: 1, url: '/images/photo1.jpeg', width: 100, height: 100 },
       { id: 2, url: '/images/photo2.jpeg', width: 200, height: 200 },
@@ -70,13 +70,13 @@ export default function Home() {
       // { id: 8, url: '/images/photo8.jpeg', width: 350, height: 500 },
     ];
 
-    // Process images for masonry layout
+    // process images for masonry layout
     const processedImages = [];
     for (let i = 0; i < 40; i++) {
       const sourceImage = sampleImages[i % sampleImages.length];
       const aspectRatio = sourceImage.width / sourceImage.height;
 
-      // Calculate span - how many rows this item should take up
+      // calculate span - how many rows this item should take up
       let span = 5;
       if (aspectRatio < 0.8) span = 15;       // Portrait
       else if (aspectRatio < 1.2) span = 10;  // Square-ish
@@ -90,7 +90,7 @@ export default function Home() {
       });
     }
 
-    // Shuffle images
+    // shuffle images
     const shuffled = [...processedImages].sort(() => Math.random() - 0.5);
     setImages(shuffled);
   }, []);
@@ -98,12 +98,12 @@ export default function Home() {
   // Handle Google login button click
   const handleGoogleLogin = async () => {
     console.log('Google login clicked');
-    // Save login time when user clicks login
+    // save login time when user clicks login
     localStorage.setItem('lastLoginTime', new Date().toISOString());
-    // 直接跳转到 Google 账户选择界面
+    // redirect to Google account selection interface
     await signIn("google", { 
       callbackUrl: "/dashboard",
-      prompt: "select_account" // 强制显示账户选择界面
+      prompt: "select_account" // force display account selection interface
     });
   };
 

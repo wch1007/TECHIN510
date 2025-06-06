@@ -8,7 +8,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   try {
     console.log("Media API route called");
     
-    // 检查环境变量
+    // check environment variables
     if (!process.env.GOOGLE_CLIENT_ID) {
       console.error("Missing GOOGLE_CLIENT_ID environment variable");
       return NextResponse.json(

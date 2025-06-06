@@ -17,8 +17,8 @@ interface MediaFile {
   videoUrl?: string;
   size?: string;
   createdTime?: string;
-  width?: number;    // 添加宽度属性
-  height?: number;   // 添加高度属性
+  width?: number;    // add width attribute
+  height?: number;   // add height attribute
 }
 
 // Define API response type
@@ -75,10 +75,10 @@ export default function Dashboard(): React.ReactElement {
     if (node) observer.current.observe(node);
   }, [loading, hasMore, nextPageToken]);
 
-  // 前端检测图片方向的状态
+  // front-end detect image orientation
   const [detectedOrientations, setDetectedOrientations] = useState<Record<string, 'portrait' | 'landscape' | 'square'>>({});
 
-  // 检测图片尺寸的辅助函数
+  // detect image size helper function
   const detectImageOrientation = useCallback((file: MediaFile): Promise<'portrait' | 'landscape' | 'square'> => {
     return new Promise((resolve) => {
       const img = new (window as any).Image() as HTMLImageElement;
@@ -112,10 +112,10 @@ export default function Dashboard(): React.ReactElement {
     });
   }, []);
 
-  // 启动前端检测
+  // start front-end detection
   useEffect(() => {
     if (files.length > 0) {
-      // 对前几张图片进行前端检测
+      // detect first few images
       files.slice(0, 20).forEach(file => {
         if (!file.mimeType.includes('video') && !detectedOrientations[file.id]) {
           detectImageOrientation(file);
@@ -124,7 +124,7 @@ export default function Dashboard(): React.ReactElement {
     }
   }, [files, detectImageOrientation, detectedOrientations]);
 
-  // 延时检测更多图片（避免一次性加载太多）
+  // delay detection of more images (avoid loading too many at once)
   useEffect(() => {
     const timer = setTimeout(() => {
       if (files.length > 20) {
@@ -134,22 +134,22 @@ export default function Dashboard(): React.ReactElement {
           }
         });
       }
-    }, 2000); // 2秒后检测更多图片
+    }, 2000); // detect more images after 2 seconds
 
     return () => clearTimeout(timer);
   }, [files, detectImageOrientation, detectedOrientations]);
 
-  // 提高缩略图质量的函数
+  // improve thumbnail quality function
   const getHighQualityThumbnail = (url: string) => {
     try {
-      // 检查 URL 是否有效
+      // check if URL is valid
       if (!url || typeof url !== 'string') {
         return '';
       }
       
-      // 如果是 Google Drive 的缩略图链接
+      // if it's a Google Drive thumbnail link
       if (url.includes('googleusercontent.com')) {
-        // 替换尺寸参数，同时保留其他参数
+        // replace size parameters, keep other parameters
         return url.replace(/=s\d+/, '=s1600').replace(/=w\d+-h\d+/, '=w1600-h1600');
       }
       
@@ -177,7 +177,7 @@ export default function Dashboard(): React.ReactElement {
       
       if (data.files && Array.isArray(data.files)) {
         const validFiles = data.files.filter(file => {
-          // 检查文件是否有效，同时支持视频和图片
+          // check if file is valid, support video and image
           const isValid = file && file.id && (
             file.thumbnailLink || 
             file.mimeType?.includes('image') || 
@@ -189,7 +189,7 @@ export default function Dashboard(): React.ReactElement {
           return isValid;
         });
         
-        // 处理文件大小显示
+        // process file size display
         const processedFiles = validFiles.map(file => ({
           ...file,
           size: file.size ? formatFileSize(parseInt(file.size)) : undefined,
@@ -209,7 +209,7 @@ export default function Dashboard(): React.ReactElement {
     }
   }, []);
 
-  // 添加文件大小格式化函数
+  // add file size formatting function
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 B';
     const k = 1024;
@@ -218,16 +218,16 @@ export default function Dashboard(): React.ReactElement {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   };
 
-  // 按图片方向分组的函数
+  // group files by orientation
   const groupFilesByOrientation = useCallback((files: MediaFile[]) => {
-    const portraitFiles: MediaFile[] = []; // 竖向图片 (高>宽)
-    const landscapeFiles: MediaFile[] = []; // 横向图片 (宽>高)
-    const squareFiles: MediaFile[] = []; // 正方形图片 (宽≈高)
+    const portraitFiles: MediaFile[] = []; // vertical images (height > width)
+    const landscapeFiles: MediaFile[] = []; // horizontal images (width > height)
+    const squareFiles: MediaFile[] = []; // square images (width ≈ height)
     
     console.log('🔍 开始分组文件，总数:', files.length, '已检测:', Object.keys(detectedOrientations).length);
     
     files.forEach(file => {
-      // 优先使用前端检测的结果
+      // use front-end detection results first
       if (detectedOrientations[file.id]) {
         const orientation = detectedOrientations[file.id];
         console.log(`✅ 使用前端检测结果 ${file.name}: ${orientation}`);
@@ -242,26 +242,25 @@ export default function Dashboard(): React.ReactElement {
         return;
       }
       
-      // 从Google Drive API获取图片尺寸（如果可用）
+      // get image size from Google Drive API if available
       if (file.width && file.height) {
         const aspectRatio = file.width / file.height;
         console.log(`📐 API数据 ${file.name}: ${file.width}x${file.height}, 比例: ${aspectRatio.toFixed(2)}`);
         
         if (aspectRatio < 0.9) {
-          portraitFiles.push(file); // 竖向
+          portraitFiles.push(file); // vertical
           console.log(`📱 竖向: ${file.name}`);
         } else if (aspectRatio > 1.1) {
-          landscapeFiles.push(file); // 横向
+          landscapeFiles.push(file); // horizontal
           console.log(`🖼️ 横向: ${file.name}`);
         } else {
-          squareFiles.push(file); // 正方形
+          squareFiles.push(file); // square
           console.log(`⬛ 正方形: ${file.name}`);
         }
       } else {
-        // 如果没有尺寸信息，先尝试根据文件名推断
+          // if no size information, try to infer from file name
         const fileName = file.name.toLowerCase();
-        
-        // 根据常见的文件名模式推断
+
         if (fileName.includes('portrait') || fileName.includes('vertical') || fileName.includes('竖') || fileName.includes('vt_')) {
           console.log(`📱 根据文件名推断为竖向: ${file.name}`);
           portraitFiles.push(file);
@@ -269,14 +268,14 @@ export default function Dashboard(): React.ReactElement {
           console.log(`⬛ 根据文件名推断为正方形: ${file.name}`);
           squareFiles.push(file);
         } else {
-          // 默认分配到横向组，等待前端检测
+          // default to horizontal group, wait for front-end detection
           console.log(`❓ 暂时分配为横向，等待检测: ${file.name}`);
           landscapeFiles.push(file);
         }
       }
     });
     
-    // 按创建时间排序每个组
+    // sort each group by creation time
     const sortByTime = (a: MediaFile, b: MediaFile) => {
       if (!a.createdTime || !b.createdTime) return 0;
       return new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime();
@@ -295,11 +294,11 @@ export default function Dashboard(): React.ReactElement {
     };
   }, [detectedOrientations]);
 
-  // 按日期分组文件的函数
+  // group files by date
   const groupFilesByDate = (files: MediaFile[]) => {
     const groups: Record<string, MediaFile[]> = {};
     
-    // 添加调试标志
+    // add debug flag
     const DEBUG_DATES = true;
     
     files.forEach(file => {
@@ -310,15 +309,15 @@ export default function Dashboard(): React.ReactElement {
       
       switch (timezoneMethod) {
         case 'utc':
-          // 使用UTC日期
+          // use UTC date
           dateKey = originalDate.toISOString().split('T')[0];
           break;
         case 'smart':
-          // 智能处理：尝试从Google Drive的预期行为推断
+          // smart processing: try to infer from Google Drive's expected behavior
           const smartDate = new Date(file.createdTime);
-          // 如果是深夜时间（可能跨日），使用智能调整
+          // if it's late night (possibly across days), use smart adjustment
           if (smartDate.getUTCHours() >= 16) { // UTC 16:00+ 可能是次日凌晨
-            const adjustedDate = new Date(smartDate.getTime() + (8 * 60 * 60 * 1000)); // 假设+8时区
+            const adjustedDate = new Date(smartDate.getTime() + (8 * 60 * 60 * 1000)); // assume +8 timezone
             dateKey = adjustedDate.toISOString().split('T')[0];
           } else {
             dateKey = smartDate.toLocaleDateString('en-CA');
@@ -328,7 +327,7 @@ export default function Dashboard(): React.ReactElement {
           dateKey = originalDate.toLocaleDateString('en-CA');
       }
       
-      // 简化的调试输出
+      // simplified debug output
       if (DEBUG_DATES) {
         console.log(`📅 ${file.name}: ${file.createdTime} → ${dateKey} (${timezoneMethod})`);
       }
@@ -354,16 +353,16 @@ export default function Dashboard(): React.ReactElement {
     return sortedGroups;
   };
 
-  // 格式化日期显示
+  // format date display
   const formatDate = (dateString: string) => {
-    // 使用安全的日期解析函数
+    // use safe date parsing function
     const date = safeParseDateString(dateString);
     
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
     
-    // 添加调试信息
+    // add debug information
     console.log(`🗓️ formatDate: ${dateString} → ${date.toDateString()}`);
     
     if (date.toDateString() === today.toDateString()) {
@@ -380,13 +379,13 @@ export default function Dashboard(): React.ReactElement {
     }
   };
 
-  // 安全的日期解析函数 - 避免时区问题
+  // safe date parsing function - avoid timezone issues
   const safeParseDateString = (dateString: string) => {
     const [year, month, day] = dateString.split('-').map(Number);
-    return new Date(year, month - 1, day); // month是0-based
+    return new Date(year, month - 1, day); // month is 0-based
   };
 
-  // 筛选文件的函数
+  // filter files by date
   const filterFilesByDate = (files: MediaFile[], filter: string) => {
     if (filter === 'all') return files;
     
@@ -412,7 +411,7 @@ export default function Dashboard(): React.ReactElement {
         case 'custom':
           if (!appliedDateRange.startDate && !appliedDateRange.endDate) return true;
           
-          // 获取文件创建的本地日期（yyyy-mm-dd格式），忽略时间部分
+          // get file created local date (yyyy-mm-dd format), ignore time part
           const fileLocalDate = fileDate.toLocaleDateString('en-CA'); // 'en-CA' gives YYYY-MM-DD format
           
           if (appliedDateRange.startDate && appliedDateRange.endDate) {
@@ -441,16 +440,16 @@ export default function Dashboard(): React.ReactElement {
     }
   }, [fetchMediaFiles]);
 
-  // 在组件顶部添加 useEffect 来加载保存的归档状态
+  // add useEffect to load saved archived state at the top of the component
   useEffect(() => {
-    // 从 localStorage 加载归档状态
+    // load archived state from localStorage
     const savedArchivedFiles = localStorage.getItem('archivedFiles');
     if (savedArchivedFiles) {
       setArchivedFiles(new Set(JSON.parse(savedArchivedFiles)));
     }
   }, []);
 
-  // Handle saving notes
+  // handle saving notes
   const handleSaveNote = (photoId: string, note: string) => {
     saveNote(photoId, note);
     setNotes(prev => ({
@@ -476,7 +475,7 @@ export default function Dashboard(): React.ReactElement {
     });
   };
 
-  // 修改 toggleArchive 函数
+  // modify toggleArchive function
   const toggleArchive = (fileId: string) => {
     setArchivedFiles(prev => {
       const newSet = new Set(prev);
@@ -485,7 +484,7 @@ export default function Dashboard(): React.ReactElement {
       } else {
         newSet.add(fileId);
       }
-      // 保存到 localStorage
+      // store to localStorage
       localStorage.setItem('archivedFiles', JSON.stringify([...newSet]));
       return newSet;
     });
